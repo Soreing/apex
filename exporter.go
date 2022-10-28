@@ -83,7 +83,7 @@ func (exp *AppInsightsExporter) ProcessInternal(
 
 	pid := sp.Parent().SpanID().String()
 	if pid == "00000000" {
-		pid := sp.SpanContext().TraceID().String()
+		pid = sp.SpanContext().TraceID().String()
 	}
 
 	tele.Tags.Cloud().SetRole(exp.servName)
@@ -129,7 +129,7 @@ func (exp *AppInsightsExporter) ProcessRequest(
 	
 	pid := sp.Parent().SpanID().String()
 	if pid == "00000000" {
-		pid := sp.SpanContext().TraceID().String()
+		pid = sp.SpanContext().TraceID().String()
 	}
 
 	tele.Tags.Cloud().SetRole(exp.servName)
@@ -175,7 +175,7 @@ func (exp *AppInsightsExporter) ProcessEvent(
 
 	pid := sp.Parent().SpanID().String()
 	if pid == "00000000" {
-		pid := sp.SpanContext().TraceID().String()
+		pid = sp.SpanContext().TraceID().String()
 	}
 
 	tele.Tags.Cloud().SetRole(exp.servName)
@@ -221,7 +221,7 @@ func (exp *AppInsightsExporter) ProcessDependency(
 
 	pid := sp.Parent().SpanID().String()
 	if pid == "00000000" {
-		pid := sp.SpanContext().TraceID().String()
+		pid = sp.SpanContext().TraceID().String()
 	}
 
 	tele.Tags.Cloud().SetRole(exp.servName)
