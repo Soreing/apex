@@ -81,9 +81,14 @@ func (exp *AppInsightsExporter) ProcessInternal(
 		},
 	}
 
+	pid := sp.Parent().SpanID().String()
+	if pid == "00000000" {
+		pid := sp.SpanContext().TraceID().String()
+	}
+
 	tele.Tags.Cloud().SetRole(exp.servName)
 	tele.Tags.Operation().SetId(sp.SpanContext().TraceID().String())
-	tele.Tags.Operation().SetParentId(sp.Parent().SpanID().String())
+	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(sp.Name())
 
 	exp.client.Track(&tele)
@@ -121,10 +126,15 @@ func (exp *AppInsightsExporter) ProcessRequest(
 		tele.ResponseCode = val
 	}
 	tele.BaseTelemetry.Properties = properties
+	
+	pid := sp.Parent().SpanID().String()
+	if pid == "00000000" {
+		pid := sp.SpanContext().TraceID().String()
+	}
 
 	tele.Tags.Cloud().SetRole(exp.servName)
 	tele.Tags.Operation().SetId(sp.SpanContext().TraceID().String())
-	tele.Tags.Operation().SetParentId(sp.Parent().SpanID().String())
+	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(sp.Name())
 
 	exp.client.Track(&tele)
@@ -163,9 +173,14 @@ func (exp *AppInsightsExporter) ProcessEvent(
 	}
 	tele.BaseTelemetry.Properties = properties
 
+	pid := sp.Parent().SpanID().String()
+	if pid == "00000000" {
+		pid := sp.SpanContext().TraceID().String()
+	}
+
 	tele.Tags.Cloud().SetRole(exp.servName)
 	tele.Tags.Operation().SetId(sp.SpanContext().TraceID().String())
-	tele.Tags.Operation().SetParentId(sp.Parent().SpanID().String())
+	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(sp.Name())
 
 	exp.client.Track(&tele)
@@ -204,9 +219,14 @@ func (exp *AppInsightsExporter) ProcessDependency(
 	}
 	tele.BaseTelemetry.Properties = properties
 
+	pid := sp.Parent().SpanID().String()
+	if pid == "00000000" {
+		pid := sp.SpanContext().TraceID().String()
+	}
+
 	tele.Tags.Cloud().SetRole(exp.servName)
 	tele.Tags.Operation().SetId(sp.SpanContext().TraceID().String())
-	tele.Tags.Operation().SetParentId(sp.Parent().SpanID().String())
+	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(sp.Name())
 
 	exp.client.Track(&tele)
