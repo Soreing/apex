@@ -8,26 +8,24 @@ import (
 	"github.com/microsoft/ApplicationInsights-Go/appinsights/contracts"
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	trace "go.opentelemetry.io/otel/trace"
 )
 
 type AppInsightsExporter struct {
-	client   appinsights.TelemetryClient
-	servName string
+	client appinsights.TelemetryClient
 }
 
 // Craetes a new App Insights Exporter with a service name
 // Logger function is called for each diagnostic message
 func NewExporter(
 	instrumentationKey string,
-	serviceName string,
 	logger func(msg string) error,
 ) (*AppInsightsExporter, error) {
 	client := appinsights.NewTelemetryClient(instrumentationKey)
 	appinsights.NewDiagnosticsMessageListener(logger)
 	return &AppInsightsExporter{
-		client:   client,
-		servName: serviceName,
+		client: client,
 	}, nil
 }
 
@@ -86,7 +84,12 @@ func (exp *AppInsightsExporter) ProcessInternal(
 		pid = sp.SpanContext().TraceID().String()
 	}
 
-	tele.Tags.Cloud().SetRole(exp.servName)
+	tele.Tags.Cloud().SetRole("unknown-service")
+	if val, ok := properties[string(semconv.ServiceNameKey)]; ok {
+		delete(properties, string(semconv.ServiceNameKey))
+		tele.Tags.Cloud().SetRole(val)
+	}
+
 	tele.Tags.Operation().SetId(sp.SpanContext().TraceID().String())
 	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(sp.Name())
@@ -117,6 +120,11 @@ func (exp *AppInsightsExporter) ProcessRequest(
 			Measurements: map[string]float64{},
 		},
 	}
+	tele.Tags.Cloud().SetRole("unknown-service")
+	if val, ok := properties[string(semconv.ServiceNameKey)]; ok {
+		delete(properties, string(semconv.ServiceNameKey))
+		tele.Tags.Cloud().SetRole(val)
+	}
 	if val, ok := properties["url"]; ok {
 		delete(properties, "url")
 		tele.Url = val
@@ -126,13 +134,12 @@ func (exp *AppInsightsExporter) ProcessRequest(
 		tele.ResponseCode = val
 	}
 	tele.BaseTelemetry.Properties = properties
-	
+
 	pid := sp.Parent().SpanID().String()
 	if pid == "0000000000000000" {
 		pid = sp.SpanContext().TraceID().String()
 	}
 
-	tele.Tags.Cloud().SetRole(exp.servName)
 	tele.Tags.Operation().SetId(sp.SpanContext().TraceID().String())
 	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(sp.Name())
@@ -163,6 +170,11 @@ func (exp *AppInsightsExporter) ProcessEvent(
 			Measurements: map[string]float64{},
 		},
 	}
+	tele.Tags.Cloud().SetRole("unknown-service")
+	if val, ok := properties[string(semconv.ServiceNameKey)]; ok {
+		delete(properties, string(semconv.ServiceNameKey))
+		tele.Tags.Cloud().SetRole(val)
+	}
 	if val, ok := properties["key"]; ok {
 		delete(properties, "key")
 		tele.Url = val
@@ -178,7 +190,6 @@ func (exp *AppInsightsExporter) ProcessEvent(
 		pid = sp.SpanContext().TraceID().String()
 	}
 
-	tele.Tags.Cloud().SetRole(exp.servName)
 	tele.Tags.Operation().SetId(sp.SpanContext().TraceID().String())
 	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(sp.Name())
@@ -209,6 +220,11 @@ func (exp *AppInsightsExporter) ProcessDependency(
 			Measurements: map[string]float64{},
 		},
 	}
+	tele.Tags.Cloud().SetRole("unknown-service")
+	if val, ok := properties[string(semconv.ServiceNameKey)]; ok {
+		delete(properties, string(semconv.ServiceNameKey))
+		tele.Tags.Cloud().SetRole(val)
+	}
 	if val, ok := properties["type"]; ok {
 		delete(properties, "type")
 		tele.Type = val
@@ -224,7 +240,6 @@ func (exp *AppInsightsExporter) ProcessDependency(
 		pid = sp.SpanContext().TraceID().String()
 	}
 
-	tele.Tags.Cloud().SetRole(exp.servName)
 	tele.Tags.Operation().SetId(sp.SpanContext().TraceID().String())
 	tele.Tags.Operation().SetParentId(pid)
 	tele.Tags.Operation().SetName(sp.Name())
@@ -261,4 +276,3 @@ func (exp *AppInsightsExporter) Process(sp sdktrace.ReadOnlySpan) {
 		exp.ProcessEvent(sp, success, props)
 	}
 }
-
