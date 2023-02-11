@@ -3,6 +3,7 @@ package apex
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/microsoft/ApplicationInsights-Go/appinsights"
@@ -15,6 +16,8 @@ import (
 
 type AppInsightsExporter struct {
 	client appinsights.TelemetryClient
+	mtx    *sync.RWMutex
+	closed bool
 }
 
 // Craetes a new App Insights Exporter with a service name
@@ -27,6 +30,8 @@ func NewExporter(
 	appinsights.NewDiagnosticsMessageListener(logger)
 	return &AppInsightsExporter{
 		client: client,
+		mtx:    &sync.RWMutex{},
+		closed: false,
 	}, nil
 }
 
@@ -35,8 +40,15 @@ func (exp *AppInsightsExporter) ExportSpans(
 	ctx context.Context,
 	spans []sdktrace.ReadOnlySpan,
 ) error {
-	for _, e := range spans {
-		exp.process(e)
+	exp.mtx.RLock()
+	defer exp.mtx.RUnlock()
+
+	if exp.closed {
+		return errors.New("exporter closed")
+	}
+
+	for i := range spans {
+		exp.process(spans[i])
 	}
 	return nil
 }
@@ -45,6 +57,10 @@ func (exp *AppInsightsExporter) ExportSpans(
 func (exp *AppInsightsExporter) Shutdown(
 	ctx context.Context,
 ) error {
+	exp.mtx.Lock()
+	defer exp.mtx.Unlock()
+	exp.closed = true
+
 	select {
 	case <-exp.client.Channel().Close(time.Minute):
 		return nil
