@@ -2,6 +2,7 @@ package apex
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/microsoft/ApplicationInsights-Go/appinsights"
@@ -35,20 +36,9 @@ func (exp *AppInsightsExporter) ExportSpans(
 	spans []sdktrace.ReadOnlySpan,
 ) error {
 	for _, e := range spans {
-		exp.Process(e)
+		exp.process(e)
 	}
 	return nil
-}
-
-// Exports an array of Open Telemetry spans to Application Insights
-func (exp *AppInsightsExporter) MarshalLog() interface{} {
-	return struct {
-		Type string
-		URL  string
-	}{
-		Type: "appInsights",
-		URL:  "",
-	}
 }
 
 // Exports an array of Open Telemetry spans to Application Insights
@@ -56,14 +46,15 @@ func (exp *AppInsightsExporter) Shutdown(
 	ctx context.Context,
 ) error {
 	select {
-	case <-exp.client.Channel().Close(10 * time.Second):
-	case <-time.After(30 * time.Second):
+	case <-exp.client.Channel().Close(time.Minute):
+		return nil
+	case <-ctx.Done():
+		return errors.New("context canceled")
 	}
-	return nil
 }
 
 // Constructs the telemetry for an internal event and sends it to the client.
-func (exp *AppInsightsExporter) ProcessInternal(
+func (exp *AppInsightsExporter) processInternal(
 	sp sdktrace.ReadOnlySpan,
 	properties map[string]string,
 ) {
@@ -72,7 +63,7 @@ func (exp *AppInsightsExporter) ProcessInternal(
 		BaseTelemetry: appinsights.BaseTelemetry{
 			Timestamp:  sp.StartTime(),
 			Tags:       make(contracts.ContextTags),
-			Properties: properties,
+			Properties: map[string]string{},
 		},
 		BaseTelemetryMeasurements: appinsights.BaseTelemetryMeasurements{
 			Measurements: map[string]float64{},
@@ -89,6 +80,7 @@ func (exp *AppInsightsExporter) ProcessInternal(
 		delete(properties, string(semconv.ServiceNameKey))
 		tele.Tags.Cloud().SetRole(val)
 	}
+	tele.BaseTelemetry.Properties = properties
 
 	tele.Tags.Operation().SetId(sp.SpanContext().TraceID().String())
 	tele.Tags.Operation().SetParentId(pid)
@@ -99,7 +91,7 @@ func (exp *AppInsightsExporter) ProcessInternal(
 
 // Constructs the telemetry for a request and sends it to the client.
 // Optional properties are examined for concrete fields and removed from the map.
-func (exp *AppInsightsExporter) ProcessRequest(
+func (exp *AppInsightsExporter) processRequest(
 	sp sdktrace.ReadOnlySpan,
 	success bool,
 	properties map[string]string,
@@ -149,7 +141,7 @@ func (exp *AppInsightsExporter) ProcessRequest(
 
 // Constructs the telemetry for an event consumed and sends it to the client.
 // Optional properties are examined for concrete fields and removed from the map.
-func (exp *AppInsightsExporter) ProcessEvent(
+func (exp *AppInsightsExporter) processEvent(
 	sp sdktrace.ReadOnlySpan,
 	success bool,
 	properties map[string]string,
@@ -199,7 +191,7 @@ func (exp *AppInsightsExporter) ProcessEvent(
 
 // Constructs the telemetry for a dependency and sends it to the client.
 // Optional properties are examined for concrete fields and removed from the map.
-func (exp *AppInsightsExporter) ProcessDependency(
+func (exp *AppInsightsExporter) processDependency(
 	sp sdktrace.ReadOnlySpan,
 	success bool,
 	properties map[string]string,
@@ -221,16 +213,17 @@ func (exp *AppInsightsExporter) ProcessDependency(
 		},
 	}
 	tele.Tags.Cloud().SetRole("unknown-service")
-	if val, ok := properties[string(semconv.ServiceNameKey)]; ok {
-		delete(properties, string(semconv.ServiceNameKey))
+	if val, ok := properties["source"]; ok {
+		delete(properties, "source")
 		tele.Tags.Cloud().SetRole(val)
 	}
 	if val, ok := properties["type"]; ok {
 		delete(properties, "type")
 		tele.Type = val
 	}
-	if val, ok := properties["target"]; ok {
-		delete(properties, "target")
+	tele.Target = "unknown-target"
+	if val, ok := properties[string(semconv.ServiceNameKey)]; ok {
+		delete(properties, string(semconv.ServiceNameKey))
 		tele.Target = val
 	}
 	tele.BaseTelemetry.Properties = properties
@@ -249,30 +242,35 @@ func (exp *AppInsightsExporter) ProcessDependency(
 
 // Preprocesses the Otel span and dispatches it to app insights differently
 // based on the span kind.
-func (exp *AppInsightsExporter) Process(sp sdktrace.ReadOnlySpan) {
+func (exp *AppInsightsExporter) process(sp sdktrace.ReadOnlySpan) {
 	success := true
 	if sp.Status().Code != codes.Ok {
 		success = false
 	}
 
-	attr := sp.Attributes()
 	props := map[string]string{}
+
+	rattr := sp.Resource().Attributes()
+	for _, e := range rattr {
+		props[string(e.Key)] = e.Value.AsString()
+	}
+	attr := sp.Attributes()
 	for _, e := range attr {
 		props[string(e.Key)] = e.Value.AsString()
 	}
 
 	switch sp.SpanKind() {
 	case trace.SpanKindUnspecified:
-		exp.ProcessInternal(sp, props)
+		exp.processInternal(sp, props)
 	case trace.SpanKindInternal:
-		exp.ProcessInternal(sp, props)
+		exp.processInternal(sp, props)
 	case trace.SpanKindServer:
-		exp.ProcessRequest(sp, success, props)
+		exp.processRequest(sp, success, props)
 	case trace.SpanKindClient:
-		exp.ProcessDependency(sp, success, props)
+		exp.processDependency(sp, success, props)
 	case trace.SpanKindProducer:
-		exp.ProcessDependency(sp, success, props)
+		exp.processDependency(sp, success, props)
 	case trace.SpanKindConsumer:
-		exp.ProcessEvent(sp, success, props)
+		exp.processEvent(sp, success, props)
 	}
 }
