@@ -142,29 +142,34 @@ func TestExportSpans(t *testing.T) {
 // TestExportSpans tests that spans fed to the exporter are processed
 func TestShutdown(t *testing.T) {
 	tests := []struct {
-		Name     string
-		Duration time.Duration
-		Error    error
+		Name        string
+		ShutdownDur time.Duration
+		ContextDur  time.Duration
+		Error       error
 	}{
 		{
-			Name:     "Normal shutdown",
-			Duration: time.Minute,
-			Error:    nil,
+			Name:        "Normal shutdown",
+			ShutdownDur: time.Millisecond,
+			ContextDur:  time.Minute,
+			Error:       nil,
 		},
 		{
-			Name:     "Context canceled during shutdown",
-			Duration: -time.Minute,
-			Error:    errors.New("context canceled"),
+			Name:        "Context canceled during shutdown",
+			ShutdownDur: time.Minute,
+			ContextDur:  time.Millisecond,
+			Error:       errors.New("context canceled"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
+			tcl := &mockTelemetryClient{closeDur: test.ShutdownDur}
 			exp, _ := NewExporter("", nil)
+			exp.client = tcl
 
 			ctx, cncl := context.WithDeadline(
 				context.Background(),
-				time.Now().Add(test.Duration),
+				time.Now().Add(test.ContextDur),
 			)
 
 			err := exp.Shutdown(ctx)

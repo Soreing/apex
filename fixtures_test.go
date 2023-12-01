@@ -12,11 +12,31 @@ import (
 
 type mockTelemetryClient struct {
 	appinsights.TelemetryClient
-	tels []appinsights.Telemetry
+	tels     []appinsights.Telemetry
+	closeDur time.Duration
 }
 
 func (tc *mockTelemetryClient) Track(tel appinsights.Telemetry) {
 	tc.tels = append(tc.tels, tel)
+}
+
+func (tc *mockTelemetryClient) Channel() appinsights.TelemetryChannel {
+	return &mockTelemetryChannel{closeDur: tc.closeDur}
+}
+
+type mockTelemetryChannel struct {
+	appinsights.TelemetryChannel
+	closeDur time.Duration
+}
+
+func (tc *mockTelemetryChannel) Close(t ...time.Duration) <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		time.Sleep(tc.closeDur)
+		ch <- struct{}{}
+		close(ch)
+	}()
+	return ch
 }
 
 type mockSpan struct {
