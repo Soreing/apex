@@ -221,7 +221,7 @@ func TestShutdown(t *testing.T) {
 		},
 		{
 			Name:     "Context canceled during shutdown",
-			Duration: 0,
+			Duration: -time.Minute,
 			Error:    errors.New("context canceled"),
 		},
 	}
