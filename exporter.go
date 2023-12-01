@@ -20,8 +20,9 @@ type AppInsightsExporter struct {
 	closed bool
 }
 
-// Craetes a new App Insights Exporter with a service name
-// Logger function is called for each diagnostic message
+// NewExporter creates a new App Insights Exporter with an app insights
+// telemetry client created from an instrumentation key. The exporter uses a
+// logger function provided as a callback for logging events.
 func NewExporter(
 	instrumentationKey string,
 	logger func(msg string) error,
@@ -35,7 +36,8 @@ func NewExporter(
 	}, nil
 }
 
-// Exports an array of Open Telemetry spans to Application Insights
+// ExportSpans processes and dispatches an array of Open Telemetry spans
+// to Application Insights.
 func (exp *AppInsightsExporter) ExportSpans(
 	ctx context.Context,
 	spans []sdktrace.ReadOnlySpan,
@@ -53,7 +55,9 @@ func (exp *AppInsightsExporter) ExportSpans(
 	return nil
 }
 
-// Exports an array of Open Telemetry spans to Application Insights
+// Shutdown closes the exporter and waits until the pending messages are sent
+// with up to one minute grace period, or until the context is canceled.
+// Grace period might change in the future to be optionable
 func (exp *AppInsightsExporter) Shutdown(
 	ctx context.Context,
 ) error {
@@ -69,7 +73,11 @@ func (exp *AppInsightsExporter) Shutdown(
 	}
 }
 
-// Constructs the telemetry for an internal event and sends it to the client.
+// processInternal constructs a telemetry for an internal event and dispatches
+// it to the application insights telemetry client.
+//
+// Application Insights specific fields are sourced from custom properties:
+// Role = properties["service.name"]
 func (exp *AppInsightsExporter) processInternal(
 	sp sdktrace.ReadOnlySpan,
 	properties map[string]string,
@@ -105,8 +113,13 @@ func (exp *AppInsightsExporter) processInternal(
 	exp.client.Track(&tele)
 }
 
-// Constructs the telemetry for a request and sends it to the client.
-// Optional properties are examined for concrete fields and removed from the map.
+// processRequest constructs the telemetry for an incoming http request
+// and and dispatches it to the application insights telemetry client.
+//
+// Application Insights specific fields are sourced from custom properties:
+// Role = properties["service.name"]
+// Url = properties["url"]
+// ResponseCode = properties["responseCode"]
 func (exp *AppInsightsExporter) processRequest(
 	sp sdktrace.ReadOnlySpan,
 	success bool,
@@ -155,8 +168,13 @@ func (exp *AppInsightsExporter) processRequest(
 	exp.client.Track(&tele)
 }
 
-// Constructs the telemetry for an event consumed and sends it to the client.
-// Optional properties are examined for concrete fields and removed from the map.
+// processEvent constructs the telemetry for an incoming event to be handled
+// and and dispatches it to the application insights telemetry client.
+//
+// Application Insights specific fields are sourced from custom properties:
+// Role = properties["service.name"]
+// Url = properties["key"]
+// ResponseCode = properties["responseCode"]
 func (exp *AppInsightsExporter) processEvent(
 	sp sdktrace.ReadOnlySpan,
 	success bool,
@@ -205,8 +223,13 @@ func (exp *AppInsightsExporter) processEvent(
 	exp.client.Track(&tele)
 }
 
-// Constructs the telemetry for a dependency and sends it to the client.
-// Optional properties are examined for concrete fields and removed from the map.
+// processDependency constructs the telemetry for an outgoing dependency
+// and and dispatches it to the application insights telemetry client.
+//
+// Application Insights specific fields are sourced from custom properties:
+// Role = properties["source"]
+// Type = properties["type"]
+// Target = properties["service.name"]
 func (exp *AppInsightsExporter) processDependency(
 	sp sdktrace.ReadOnlySpan,
 	success bool,
@@ -256,8 +279,8 @@ func (exp *AppInsightsExporter) processDependency(
 	exp.client.Track(&tele)
 }
 
-// Preprocesses the Otel span and dispatches it to app insights differently
-// based on the span kind.
+// process routes the span to different processing functions based on the
+// span's kind to be processed appropriately
 func (exp *AppInsightsExporter) process(sp sdktrace.ReadOnlySpan) {
 	success := true
 	if sp.Status().Code != codes.Ok {
