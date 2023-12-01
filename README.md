@@ -1,4 +1,10 @@
 # AppInsights Exporter
+
+![Build](https://github.com/soreing/apex/actions/workflows/build_status.yaml/badge.svg)
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Soreing/4b6f950f01f3e6e5b9ed17b268664538/raw/apex)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Soreing/apex)](https://goreportcard.com/report/github.com/Soreing/apex)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Soreing/apex.svg)](https://pkg.go.dev/github.com/Soreing/apex)
+
 Apex is a basic Open Telemetry span exporter to Azure App Insights, wrapped around the official SDK.
 
 ## Usage
