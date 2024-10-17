@@ -36,6 +36,26 @@ func NewExporter(
 	}, nil
 }
 
+// NewExporterFromConfig creates a new App Insights Exporter with an app
+// insights telemetry client created from a telemetry configuration. The
+// exporter uses a logger function provided as a callback for logging events.
+func NewExporterFromConfig(
+	cfg *appinsights.TelemetryConfiguration,
+	logger func(msg string) error,
+) (*AppInsightsExporter, error) {
+	if cfg == nil {
+		return nil, errors.New("configuration is nil")
+	}
+
+	client := appinsights.NewTelemetryClientFromConfig(cfg)
+	appinsights.NewDiagnosticsMessageListener(logger)
+	return &AppInsightsExporter{
+		client: client,
+		mtx:    &sync.RWMutex{},
+		closed: false,
+	}, nil
+}
+
 // ExportSpans processes and dispatches an array of Open Telemetry spans
 // to Application Insights.
 func (exp *AppInsightsExporter) ExportSpans(

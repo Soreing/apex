@@ -27,13 +27,13 @@ func TestNewExporter(t *testing.T) {
 	}{
 		{
 			Name:   "New exporter",
-			IKey:   "",
+			IKey:   "00000000-0000-0000-0000-000000000000",
 			Logger: nil,
 			Error:  nil,
 		},
 		{
 			Name: "New exporter with logger",
-			IKey: "",
+			IKey: "00000000-0000-0000-0000-000000000000",
 			Logger: func(msg string) error {
 				println(msg)
 				return nil
@@ -52,6 +52,58 @@ func TestNewExporter(t *testing.T) {
 			assert.NotNil(t, exp.mtx)
 			assert.Equal(t, exp.closed, false)
 			assert.Equal(t, test.IKey, exp.client.InstrumentationKey())
+		})
+	}
+}
+
+// TestNewExporterFromConfig tests that an exporter is created accurately
+// given the input parameters are correct
+func TestNewExporterFromConfig(t *testing.T) {
+	tests := []struct {
+		Name   string
+		Config *appinsights.TelemetryConfiguration
+		Logger func(msg string) error
+		Error  error
+	}{
+		{
+			Name:   "New exporter",
+			Config: appinsights.NewTelemetryConfiguration("00000000-0000-0000-0000-000000000000"),
+			Logger: nil,
+			Error:  nil,
+		},
+		{
+			Name:   "New exporter with missing config",
+			Config: nil,
+			Logger: nil,
+			Error:  errors.New("configuration is nil"),
+		},
+		{
+			Name:   "New exporter with logger",
+			Config: appinsights.NewTelemetryConfiguration(""),
+			Logger: func(msg string) error {
+				println(msg)
+				return nil
+			},
+			Error: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			exp, err := NewExporterFromConfig(test.Config, test.Logger)
+
+			assert.Equal(t, test.Error, err)
+			if test.Error == nil {
+				assert.NotNil(t, exp)
+				exIKey := test.Config.InstrumentationKey
+				acIKey := exp.client.InstrumentationKey()
+				assert.Equal(t, exIKey, acIKey)
+
+				assert.NotNil(t, exp.mtx)
+				assert.Equal(t, exp.closed, false)
+			} else {
+				assert.Nil(t, exp)
+			}
 		})
 	}
 }
